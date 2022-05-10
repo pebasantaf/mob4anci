@@ -159,6 +159,14 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
                 checks = updateListofLists(checks,checkMKenergy,index,7)
                 checks = updateListofLists(checks,valueMKenergy,index,8)
+                
+                #CHECK4: Maximum power when limited reservoir
+                
+                checkLRpower = inputdata.power >= mkpower * 1.25
+                valueLRpower = str(round(inputdata.power,4)) + '/' + str(round(mkpower*1.25,4))
+                
+                checks = updateListofLists(checks,checkLRpower,index,9)
+                checks = updateListofLists(checks,valueLRpower,index,10)
 
     elif servicetype == "redispatch":
 
