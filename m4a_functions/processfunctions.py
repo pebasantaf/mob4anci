@@ -6,7 +6,8 @@ from pathlib import Path
 
 def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
-    checks = [['-']]*5
+    checks = [['-']]*9
+    
 
     # updating inputdata considering negative/positive power balancing
 
@@ -56,12 +57,15 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
             
             checks = updateListofLists(checks,row[0],index,0)
 
+
             
             # CHECK1: check minimum bidding power is fulfilled
 
             checkpower = inputdata.power > row.minimum_bid_power
+            valuepower = str(round(inputdata.power,4)) + '/' + str(round(row.minimum_bid_power,4))
             
             checks = updateListofLists(checks,checkpower,index,1)
+            checks = updateListofLists(checks,valuepower,index,2)
 
 
             
@@ -69,14 +73,16 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             if row.ramp_up == '-': #no minimum ramp required
                 
-                checks = updateListofLists(checks,'-',index,2)
+                checks = updateListofLists(checks,'-',index,3)
+                checks = updateListofLists(checks,'-',index,4)
                 print("No minimum ramp required.")
 
             else:
 
                 if inputdata.rampup == 'inst.': # if the ramp is instantaneous, then it already passes the check
 
-                    checks = updateListofLists(checks,True,index,2)
+                    checks = updateListofLists(checks,True,index,3)
+                    checks = updateListofLists(checks,'inst.',index,4)
 
                 else: #if not, calculate the slopes and compared them
                     
@@ -88,8 +94,10 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
                     #comparison values. storing 
                     checkrampup = inputslope > serviceslope
+                    valuerampup = str(round(inputslope,4)) + '/' + str(round(serviceslope,4))
 
-                    checks = updateListofLists(checks,checkrampup,index,2)
+                    checks = updateListofLists(checks,checkrampup,index,3)
+                    checks = updateListofLists(checks,valuerampup,index,4)
 
 
 
@@ -141,12 +149,16 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
                 # calcualte checks
                 checkPQenergy = inputdata.energy >= pqenergy
+                valuePQenergy = str(round(inputdata.energy,4)) + '/' + str(round(pqenergy,4))
 
-                checks = updateListofLists(checks,checkPQenergy,index,3)
+                checks = updateListofLists(checks,checkPQenergy,index,5)
+                checks = updateListofLists(checks,valuePQenergy,index,6)
 
                 checkMKenergy = inputdata.energy >= minMKenergy
+                valueMKenergy = str(round(inputdata.energy,4)) + '/' + str(round(minMKenergy,4))
 
-                checks = updateListofLists(checks,checkMKenergy,index,4)
+                checks = updateListofLists(checks,checkMKenergy,index,7)
+                checks = updateListofLists(checks,valueMKenergy,index,8)
 
     elif servicetype == "redispatch":
 

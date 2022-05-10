@@ -46,8 +46,7 @@ def readAnService(path, servicetype):
     return data
 
 def writeOutput(path, id, servicetype, checks):
-    ''' get the path and opern the workbook. Then, we get the checks that we have stored in the checks list obtaine from comaperValues.
-    '''
+
     wb = oxl.load_workbook(path)
     wsname = wb.sheetnames[0]
     ws = wb[wsname]
