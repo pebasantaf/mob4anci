@@ -1,3 +1,4 @@
+import statistics
 
 def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
@@ -26,12 +27,22 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             print("Balancing reserve provider with limited storage capacity. Marketable power of: " + str(mkpower) + "MW")
             limres = True
-        
-
 
         # for every of the three frequency reserve products
 
         for index,row in servicedata.iterrows(): 
+            
+            # if we have symmetric control reserve and mFRR and aFRR, dont do checks
+            
+            if row.loc["product"]== 'FCR' and inputdata.controlreserve == 'symmetric':
+                
+                pass
+            
+            else:
+                
+                print(row.loc["product"] +" does not offer symmetric reserve control.")
+                
+                continue
             
             print("Analyzing " + row.loc["product"] + "product.\n")
             
@@ -79,7 +90,6 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             # CHECK3: minimum energy to PQ and MK energy capacity
 
-            ''' this part needs updated. I need to check well the formulas as there are things missing, like the 2 in case of symmetric auctioning and so on'''
 
             # check if there is the reservoir is limited
 
@@ -193,12 +203,14 @@ def checkControlReserve(data):
 
         data.energy = data.energy * data.chargeefficiency
         data.power = data.power * data.chargeefficiency
+        
 
-    elif data.controlserver == 'symmetric': # if we want both, then calculate both and check the minimum energy/power value. This is what ultimately will qualify
+    elif data.controlreserve == 'symmetric': # if we want both, then calculate both and check the minimum energy/power value. This is what ultimately will qualify
 
-        data.energy = data.energy * min(data.chargeefficiency, data.dischargeefficiency)
+        
+        data.energy = data.energy * statistics.mean([data.chargeefficiency, data.dischargeefficiency])
 
-        data.power = data.power * min(data.chargeefficiency, data.dischargeefficiency)
+        data.power = data.power * statistics.mean([data.chargeefficiency, data.dischargeefficiency])
 
     else:
 
