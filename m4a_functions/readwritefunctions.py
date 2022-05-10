@@ -44,33 +44,39 @@ def writeOutput(path, id, servicetype, checks):
     wb = oxl.load_workbook(path)
     wsname = wb.sheetnames[0]
     ws = wb[wsname]
-    rowindex = ws.max_row + 1 
+    
+    for j in range(len(checks[0])):
+        
+        rowindex = ws.max_row + 1
 
-    for colindex in range(1,ws.max_column+1):
+        for colindex in range(1,ws.max_column+1):
 
-        #first column is always id
+            #first column is always id
 
-        if colindex == 1:
+            if colindex == 1:
 
-            ws.cell(row=rowindex, column=colindex).value = id
+                ws.cell(row=rowindex, column=colindex).value = id
 
-        #second column is always service type
+            #second column is always service type
 
-        elif colindex == 2:
+            elif colindex == 2:
 
-            ws.cell(row=rowindex,column=colindex).value = servicetype
+                ws.cell(row=rowindex,column=colindex).value = servicetype
 
-        #add the booleans values of the checks
-
-        else:
-            # if any of the columns does not have a check boolean, just write '-'
-            if checks[colindex-3] ==  None:
-
-                ws.cell(row=rowindex,column=colindex).value = '-'
+            #add the product and the boolean checks
 
             else:
+                # check if it is string or not, and write
+                
+                if not isinstance(checks[colindex-3][j], str):
+                    
+                    ws.cell(row=rowindex,column=colindex).value = str(checks[colindex-3][j])
+                    
+                else:
+                    
+                    ws.cell(row=rowindex,column=colindex).value = checks[colindex-3][j]
+                
 
-                ws.cell(row=rowindex,column=colindex).value = str(checks[colindex-3])
         
     wb.save(path)
             

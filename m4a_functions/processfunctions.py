@@ -1,7 +1,7 @@
 
 def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
-    checks = [[None]]*4
+    checks = [['-']]*5
 
     # updating inputdata considering negative/positive power balancing
 
@@ -35,13 +35,16 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
             
             print("Analyzing " + row.loc["product"] + "product.\n")
             
+            # add product to check list
             
+            checks = updateListofLists(checks,row[0],index,0)
 
+            
             # CHECK1: check minimum bidding power is fulfilled
 
             checkpower = inputdata.power > row.minimum_bid_power
             
-            checks = updateListofLists(checks,checkpower,index,0)
+            checks = updateListofLists(checks,checkpower,index,1)
 
 
             
@@ -49,27 +52,27 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             if row.ramp_up == '-': #no minimum ramp required
                 
-                checks = updateListofLists(checks,'-',index,1)
+                checks = updateListofLists(checks,'-',index,2)
                 print("No minimum ramp required.")
 
             else:
 
                 if inputdata.rampup == 'inst.': # if the ramp is instantaneous, then it already passes the check
 
-                    checks = updateListofLists(checks,True,index,1)
+                    checks = updateListofLists(checks,True,index,2)
 
                 else: #if not, calculate the slopes and compared them
                     
                     # values of input to compare
-                    inputslope = float(inputdata.rampup.split('/')[1])/float(inputdata.rampup.split('/')[0])
+                    inputslope = float(inputdata.rampup.split('/')[1]) / float(inputdata.rampup.split('/')[0])
 
                     # values of ancillary service to compare
-                    serviceslope = float(row.ramp_up.split('/')[1])/float(row.ramp_up.split('/')[0])
+                    serviceslope = float(row.ramp_up.split('/')[1]) / float(row.ramp_up.split('/')[0])
 
                     #comparison values. storing 
                     checkrampup = inputslope > serviceslope
 
-                    checks = updateListofLists(checks,checkrampup,index,1)
+                    checks = updateListofLists(checks,checkrampup,index,2)
 
 
 
@@ -91,7 +94,7 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
                     if row.loc[cap] == '-': #if there is an x in the data, meaning that there is no minimum requirement
                         
-                        print("No minimum " + cap.split('_')[-1] + 
+                        print("No minimum MK" + cap.split('_')[-1] + 
                         " capacity requirement for " + row.loc["product"] + "product.")
 
                     elif "PQ" in cap: # if PQ is in the minimum capacity column name: if we are dealing with min PQ power conditions
@@ -102,28 +105,32 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
                         mkenergy += [mkpower * row.loc[cap]] #MK power times time
 
+                # multiplier selection, considering that the bidding might be symmetrical
+                
+                mult = 1
+                
+                if inputdata.controlreserve == "symmetric":
+                    
+                    mult = 2
+                
                 # check which services we are dealing with so we can calculate full MK power
 
                 if row.loc["product"] == "FCR":
 
-                    minMKenergy = mkenergy[0] + max(mkenergy[1], mkenergy[2])
+                    minMKenergy = mult *(mkenergy[0] + max(mkenergy[1], mkenergy[2]))
                 
                 else:
 
-                    minMKenergy = mkenergy[0]
+                    minMKenergy = mult * mkenergy[0]
 
+                # calcualte checks
                 checkPQenergy = inputdata.energy >= pqenergy
 
-                checks = updateListofLists(checks,checkPQenergy,index,2)
+                checks = updateListofLists(checks,checkPQenergy,index,3)
 
                 checkMKenergy = inputdata.energy >= minMKenergy
 
-                checks = updateListofLists(checks,checkMKenergy,index,3)
-
-                #CHECK4: how much 
-
-
-        ''' i have to change the checks here. Now only the checks for 1 product are really stored. I need for the three products'''  
+                checks = updateListofLists(checks,checkMKenergy,index,4)
 
     elif servicetype == "redispatch":
 
@@ -137,12 +144,13 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             checkpower = inputdata.power > servicedata.minimum_bid_power_2[0]
             
-        checks[0] = checkpower
+        checks[1] = [checkpower]
 
     return checks
 
 def updateListofLists(list,value,index,pos):
 
+    # one index for each freq_control product and one pos for each check
     if index == 0:
 
         list[pos] = [value]
@@ -184,17 +192,13 @@ def checkControlReserve(data):
     elif data.controlreserve == 'negative': #otherwise, by charging one
 
         data.energy = data.energy * data.chargeefficiency
-        data.power = data.power * data.dischargeefficiency
+        data.power = data.power * data.chargeefficiency
 
     elif data.controlserver == 'symmetric': # if we want both, then calculate both and check the minimum energy/power value. This is what ultimately will qualify
 
-        encharge = data.energy * data.chargeefficiency
-        endischarge = data.energy * data.dischargeefficiency
-        data.energy = min(encharge,endischarge)
+        data.energy = data.energy * min(data.chargeefficiency, data.dischargeefficiency)
 
-        powcharge = data.power * data.chargeefficiency
-        powdischarge = data.power * data.dischargeefficiency
-        data.power = min(powcharge,powdischarge)
+        data.power = data.power * min(data.chargeefficiency, data.dischargeefficiency)
 
     else:
 
