@@ -1,4 +1,8 @@
 import statistics
+from m4a_functions.readwritefunctions import *
+from m4a_functions.processfunctions import *
+import os
+from pathlib import Path
 
 def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
@@ -34,17 +38,19 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
             
             # if we have symmetric control reserve and mFRR and aFRR, dont do checks
             
-            if row.loc["product"]== 'FCR' and inputdata.controlreserve == 'symmetric':
+            if row.loc["product"]== 'FCR':
                 
                 pass
             
             else:
                 
-                print(row.loc["product"] +" does not offer symmetric reserve control.")
-                
-                continue
+                if inputdata.controlreserve == 'symmetric':
+                    
+                    print(row.loc["product"] +" does not offer symmetric reserve control.\n")
+                    
+                    continue
             
-            print("Analyzing " + row.loc["product"] + "product.\n")
+            print("Analyzing " + row.loc["product"] + " product.\n")
             
             # add product to check list
             
@@ -219,7 +225,23 @@ def checkControlReserve(data):
     return data
 
 
+def runTool():
 
+    servicelist = ['freq_control', 'redispatch']
+    service = servicelist[0] 
+    
+    
+    path = Path(os.getcwd()).parent
+
+    input = readInput(path/'inputvalues.xlsx')
+
+    ancillarydata = readAnService(path/'ancillaryservicevalues.xlsx', service)
+
+    for i in range(len(input)):
+    
+        checks = compareValues(input[i], ancillarydata, service, weeksection="hol", timeslice=2)
+
+        writeOutput(path/'outputvalues.xlsx', input[i].id, service, checks)
                 
 
 

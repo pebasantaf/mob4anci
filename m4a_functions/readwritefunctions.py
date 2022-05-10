@@ -6,27 +6,34 @@ from m4a_classes.inputclass import inputInfo
 
 
 
+
 def readInput(path):
 
     data = pd.read_excel(path, 'input')
+    data = data.drop(data[data.readinput==0].index)
     
     dayoption = ['week', 'sat', 'hol'] #workweek, saturday, holiday/sunday
 
-    aktInput = inputInfo()
-    items = list(aktInput.__dict__.keys())
+    aktInput = [None]*data.shape[0] #initialize empty list. I dont initialize with the 
+    #class already cause python will just create a copy of the class and not 2 independent
+    
+    for j in range(len(aktInput)):
+        
+        aktInput[j] = inputInfo()
+        items = list(aktInput[j].__dict__.keys())
 
-    for element in items:
+        for element in items:
 
-        if element =='connectivity':
+            if element =='connectivity':
 
-            cols = [aktInput.id + '_' + day for day in dayoption]
-            connectivity = pd.read_excel(path, 'connectivity', index_col=0).loc[:,cols]
+                cols = [aktInput[j].id + '_' + day for day in dayoption]
+                connectivity = pd.read_excel(path, 'connectivity', index_col=0).loc[:,cols]
 
-        else:
+            else:
 
-            setattr(aktInput, element, data.loc[0, element])
+                setattr(aktInput[j], element, data[element].iloc[j])
 
-    aktInput.connectivity = connectivity
+        aktInput[j].connectivity = connectivity
 
 
 
@@ -79,9 +86,7 @@ def writeOutput(path, id, servicetype, checks):
 
         
     wb.save(path)
-            
 
-    print()
 
 
 
