@@ -60,105 +60,23 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             
             # CHECK1: check minimum bidding power is fulfilled
-
-            checkpower = inputdata.power > row.minimum_bid_power
-            valuepower = str(round(inputdata.power,4)) + '/' + str(round(row.minimum_bid_power,4))
             
-            checks = updateListofLists(checks,checkpower,index,1)
-            checks = updateListofLists(checks,valuepower,index,2)
-
+            checks = check1freqcontrol(inputdata, row, index, checks)
 
             
             # CHECK2: check if ramping requirement is fulfilled
+            
+            checks = check2freqcontrol(inputdata, row, index, checks)
 
-            if row.ramp_up == '-': #no minimum ramp required
-                
-                checks = updateListofLists(checks,'-',index,3)
-                checks = updateListofLists(checks,'-',index,4)
-                print("No minimum ramp required.")
-
-            else:
-
-                if inputdata.rampup == 'inst.': # if the ramp is instantaneous, then it already passes the check
-
-                    checks = updateListofLists(checks,True,index,3)
-                    checks = updateListofLists(checks,'inst.',index,4)
-
-                else: #if not, calculate the slopes and compared them
-                    
-                    # values of input to compare
-                    inputslope = float(inputdata.rampup.split('/')[1]) / float(inputdata.rampup.split('/')[0])
-
-                    # values of ancillary service to compare
-                    serviceslope = float(row.ramp_up.split('/')[1]) / float(row.ramp_up.split('/')[0])
-
-                    #comparison values. storing 
-                    checkrampup = inputslope > serviceslope
-                    valuerampup = str(round(inputslope,4)) + '/' + str(round(serviceslope,4))
-
-                    checks = updateListofLists(checks,checkrampup,index,3)
-                    checks = updateListofLists(checks,valuerampup,index,4)
-
-
-
-
+            
             # CHECK3: minimum energy to PQ and MK energy capacity
 
 
             # check if there is the reservoir is limited
 
             if limres:
-
-                # calculate minimum energies with respect to PQ or MK powers
-
-                mincaplist = [s for s in row.keys() if "min_cap" in s]
-                mkenergy = []
-
-                for cap in mincaplist: #for every row column that has data about minimum capacity
-
-                    if row.loc[cap] == '-': #if there is an x in the data, meaning that there is no minimum requirement
-                        
-                        print("No minimum MK" + cap.split('_')[-1] + 
-                        " capacity requirement for " + row.loc["product"] + "product.")
-
-                    elif "PQ" in cap: # if PQ is in the minimum capacity column name: if we are dealing with min PQ power conditions
-
-                        pqenergy = inputdata.power * row.loc[cap] # PQ power times time
-
-                    else:
-
-                        mkenergy += [mkpower * row.loc[cap]] #MK power times time
-
-                # multiplier selection, considering that the bidding might be symmetrical
                 
-                mult = 1
-                
-                if inputdata.controlreserve == "symmetric":
-                    
-                    mult = 2
-                
-                # check which services we are dealing with so we can calculate full MK power
-
-                if row.loc["product"] == "FCR":
-
-                    minMKenergy = mult *(mkenergy[0] + max(mkenergy[1], mkenergy[2]))
-                
-                else:
-
-                    minMKenergy = mult * mkenergy[0]
-
-                # calcualte checks
-                checkPQenergy = inputdata.energy >= pqenergy
-                valuePQenergy = str(round(inputdata.energy,4)) + '/' + str(round(pqenergy,4))
-
-                checks = updateListofLists(checks,checkPQenergy,index,5)
-                checks = updateListofLists(checks,valuePQenergy,index,6)
-
-                checkMKenergy = inputdata.energy >= minMKenergy
-                valueMKenergy = str(round(inputdata.energy,4)) + '/' + str(round(minMKenergy,4))
-
-                checks = updateListofLists(checks,checkMKenergy,index,7)
-                checks = updateListofLists(checks,valueMKenergy,index,8)
+                checks = check3freqcontrol(inputdata, row, index, mkpower, checks)
                 
                 
                 
@@ -185,6 +103,119 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
         checks[1] = [checkpower]
 
     return checks
+
+def check1freqcontrol(inputdata, dfrow, dfindex, checks):
+    
+    checkpower = inputdata.power > dfrow.minimum_bid_power
+    valuepower = str(round(inputdata.power,4)) + '/' + str(round(dfrow.minimum_bid_power,4))
+            
+    checks = updateListofLists(checks,checkpower,dfindex,1)
+    checks = updateListofLists(checks,valuepower,dfindex,2)
+    
+    return checks
+    
+    
+    
+def check2freqcontrol(inputdata, dfrow, dfindex, checks):
+    
+    if dfrow.ramp_up == '-': #no minimum ramp required
+                
+        checks = updateListofLists(checks,'-',dfindex,3)
+        checks = updateListofLists(checks,'-',dfindex,4)
+        print("No minimum ramp required.")
+
+    else:
+
+        if inputdata.rampup == 'inst.': # if the ramp is instantaneous, then it already passes the check
+
+            checks = updateListofLists(checks,True,dfindex,3)
+            checks = updateListofLists(checks,'inst.',dfindex,4)
+
+        else: #if not, calculate the slopes and compared them
+            
+            # values of input to compare
+            inputslope = float(inputdata.rampup.split('/')[1]) / float(inputdata.rampup.split('/')[0])
+
+            # values of ancillary service to compare
+            serviceslope = float(dfrow.ramp_up.split('/')[1]) / float(dfrow.ramp_up.split('/')[0])
+
+            #comparison values. storing 
+            checkrampup = inputslope > serviceslope
+            valuerampup = str(round(inputslope,4)) + '/' + str(round(serviceslope,4))
+
+            checks = updateListofLists(checks,checkrampup,dfindex,3)
+            checks = updateListofLists(checks,valuerampup,dfindex,4)
+            
+        return checks
+            
+            
+            
+def check3freqcontrol(inputdata, dfrow, dfindex, mkpower, checks):
+
+    # calculate minimum energies with respect to PQ or MK powers
+
+    mincaplist = [s for s in dfrow.keys() if "min_cap" in s]
+    mkenergy = []
+
+    for cap in mincaplist: #for every row column that has data about minimum capacity
+
+        if dfrow.loc[cap] == '-': #if there is an x in the data, meaning that there is no minimum requirement
+            
+            print("No minimum MK" + cap.split('_')[-1] + 
+            " capacity requirement for " + dfrow.loc["product"] + "product.")
+
+        elif "PQ" in cap: # if PQ is in the minimum capacity column name: if we are dealing with min PQ power conditions
+
+            pqenergy = inputdata.power * dfrow.loc[cap] # PQ power times time
+
+        else:
+
+            mkenergy += [mkpower * dfrow.loc[cap]] #MK power times time
+
+    # multiplier selection, considering that the bidding might be symmetrical
+    
+    mult = 1
+    
+    if inputdata.controlreserve == "symmetric":
+        
+        mult = 2
+    
+    # check which services we are dealing with so we can calculate full MK power
+
+    if dfrow.loc["product"] == "FCR":
+
+        minMKenergy = mult *(mkenergy[0] + max(mkenergy[1], mkenergy[2]))
+    
+    else:
+
+        minMKenergy = mult * mkenergy[0]
+
+    # calcualte checks
+    checkPQenergy = inputdata.energy >= pqenergy
+    valuePQenergy = str(round(inputdata.energy,4)) + '/' + str(round(pqenergy,4))
+
+    checks = updateListofLists(checks,checkPQenergy,dfindex,5)
+    checks = updateListofLists(checks,valuePQenergy,dfindex,6)
+
+    checkMKenergy = inputdata.energy >= minMKenergy
+    valueMKenergy = str(round(inputdata.energy,4)) + '/' + str(round(minMKenergy,4))
+
+    checks = updateListofLists(checks,checkMKenergy,dfindex,7)
+    checks = updateListofLists(checks,valueMKenergy,dfindex,8)
+    
+    return checks
+    
+
+def check4freqcontrol(inputdata,dfindex, mkpower, checks):
+    
+    checkLRpower = inputdata.power >= mkpower * 1.25
+    valueLRpower = str(round(inputdata.power,4)) + '/' + str(round(mkpower*1.25,4))
+    
+    checks = updateListofLists(checks,checkLRpower,dfindex,9)
+    checks = updateListofLists(checks,valueLRpower,dfindex,10)
+    
+    return checks
+    
 
 def updateListofLists(list,value,index,pos):
 
