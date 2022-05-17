@@ -4,14 +4,12 @@ from m4a_functions.processfunctions import *
 import os
 from pathlib import Path
 
-def compareValues(inputdata, servicedata, servicetype,**kwargs):
+def compareValues(inputdata, servicedata, servicetype, writecols,**kwargs):
 
-    checks = [['-']]*11
+    checks = [['-']]*12
     
 
     # updating inputdata considering negative/positive power balancing
-
-    inputdata = checkControlReserve(inputdata)
 
     if servicetype == 'freq_control':
 
@@ -37,35 +35,27 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
         for index,row in servicedata.iterrows(): 
             
-            # if we have symmetric control reserve and mFRR and aFRR, dont do checks
             
-            if row.loc["product"]== 'FCR':
-                
-                pass
+            # here efficiencies are applied considering which type of reserve (positive, negative symetric) we are dealing with
+            loopdata = checkControlReserve(inputdata, row.reservetype) # we give a new variable name so we are not applying efficiency over efficiency
             
-            else:
-                
-                if inputdata.controlreserve == 'symmetric':
-                    
-                    print(row.loc["product"] +" does not offer symmetric reserve control.\n")
-                    
-                    continue
             
             print("\nAnalyzing " + row.loc["product"] + " product.\n")
             
             # add product to check list
             
-            checks = updateListofLists(checks,row[0],index,0)
+            checks = updateListofLists(checks, row["product"], index, writecols.index('product'))
+            checks = updateListofLists(checks, row["reservetype"], index, writecols.index('reservetype'))
 
             
             # CHECK1: check minimum bidding power is fulfilled
             
-            checks = check1freqcontrol(inputdata, row, index, checks)
+            checks = check1freqcontrol(loopdata, row, index, checks, writecols)
 
             
             # CHECK2: check if ramping requirement is fulfilled
             
-            checks = check2freqcontrol(inputdata, row, index, checks)
+            checks = check2freqcontrol(loopdata, row, index, checks, writecols)
 
             
             # CHECK3: minimum energy to PQ and MK energy capacity
@@ -75,56 +65,56 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
             if limres:
                 
-                checks = check3freqcontrol(inputdata, row, index, mkpower, checks)
+                checks = check3freqcontrol(loopdata, row, index, mkpower, checks, writecols)
                 
                 #CHECK4: Maximum power when limited reservoir
                 
-                checks = check4freqcontrol(inputdata, index, mkpower, checks)
+                checks = check4freqcontrol(loopdata, index, mkpower, checks, writecols)
                 
 
     elif servicetype == "redispatch":
 
         # here, we only have 2 cases. If the storage is remotelty controllable or not.
 
-        if inputdata.remotecontrol:
+        if loopdata.remotecontrol:
 
-            checkpower = inputdata.power > servicedata.minimum_bid_power_1[0]
+            checkpower = loopdata.power > servicedata.minimum_bid_power_1[0]
 
         elif not inputdata.remotecontrol:
 
-            checkpower = inputdata.power > servicedata.minimum_bid_power_2[0]
+            checkpower = loopdata.power > servicedata.minimum_bid_power_2[0]
             
         checks[1] = [checkpower]
 
     return checks
 
 
-def check1freqcontrol(inputdata, dfrow, dfindex, checks):
+def check1freqcontrol(inputdata, dfrow, dfindex, checks, writecols):
     
     checkpower = inputdata.power > dfrow.minimum_bid_power
     valuepower = str(round(inputdata.power,4)) + '/' + str(round(dfrow.minimum_bid_power,4))
             
-    checks = updateListofLists(checks,checkpower,dfindex,1)
-    checks = updateListofLists(checks,valuepower,dfindex,2)
+    checks = updateListofLists(checks,checkpower,dfindex,writecols.index('minPower'))
+    checks = updateListofLists(checks,valuepower,dfindex,writecols.index('minPower_values'))
     
     return checks
     
     
     
-def check2freqcontrol(inputdata, dfrow, dfindex, checks):
+def check2freqcontrol(inputdata, dfrow, dfindex, checks, writecols):
     
     if dfrow.ramp_up == '-': #no minimum ramp required
                 
-        checks = updateListofLists(checks,'-',dfindex,3)
-        checks = updateListofLists(checks,'-',dfindex,4)
+        checks = updateListofLists(checks,'-',dfindex,writecols.index('minRamp'))
+        checks = updateListofLists(checks,'-',dfindex,writecols.index('minRamp_values'))
         print(" - No minimum ramp required.")
 
     else:
 
         if inputdata.rampup == 'inst.': # if the ramp is instantaneous, then it already passes the check
 
-            checks = updateListofLists(checks,True,dfindex,3)
-            checks = updateListofLists(checks,'inst.',dfindex,4)
+            checks = updateListofLists(checks,True,dfindex,writecols.index('minRamp'))
+            checks = updateListofLists(checks,'inst.',dfindex,writecols.index('minRamp_values'))
 
         else: #if not, calculate the slopes and compared them
             
@@ -138,14 +128,14 @@ def check2freqcontrol(inputdata, dfrow, dfindex, checks):
             checkrampup = inputslope > serviceslope
             valuerampup = str(round(inputslope,4)) + '/' + str(round(serviceslope,4))
 
-            checks = updateListofLists(checks,checkrampup,dfindex,3)
-            checks = updateListofLists(checks,valuerampup,dfindex,4)
+            checks = updateListofLists(checks,checkrampup, dfindex, writecols.index('minRamp'))
+            checks = updateListofLists(checks,valuerampup, dfindex, writecols.index('minRamp_values'))
             
     return checks
             
             
             
-def check3freqcontrol(inputdata, dfrow, dfindex, mkpower, checks):
+def check3freqcontrol(inputdata, dfrow, dfindex, mkpower, checks, writecols):
 
     # calculate minimum energies with respect to PQ or MK powers
 
@@ -171,7 +161,7 @@ def check3freqcontrol(inputdata, dfrow, dfindex, mkpower, checks):
     
     mult = 1
     
-    if inputdata.controlreserve == "symmetric":
+    if dfrow.reservetype == "symmetric":
         
         mult = 2
     
@@ -189,25 +179,25 @@ def check3freqcontrol(inputdata, dfrow, dfindex, mkpower, checks):
     checkPQenergy = inputdata.energy >= pqenergy
     valuePQenergy = str(round(inputdata.energy,4)) + '/' + str(round(pqenergy,4))
 
-    checks = updateListofLists(checks,checkPQenergy,dfindex,5)
-    checks = updateListofLists(checks,valuePQenergy,dfindex,6)
+    checks = updateListofLists(checks,checkPQenergy,dfindex,writecols.index('minPQenergy'))
+    checks = updateListofLists(checks,valuePQenergy,dfindex,writecols.index('minPQenergy_values'))
 
     checkMKenergy = inputdata.energy >= minMKenergy
     valueMKenergy = str(round(inputdata.energy,4)) + '/' + str(round(minMKenergy,4))
 
-    checks = updateListofLists(checks,checkMKenergy,dfindex,7)
-    checks = updateListofLists(checks,valueMKenergy,dfindex,8)
+    checks = updateListofLists(checks,checkMKenergy,dfindex,writecols.index('minMKenergy'))
+    checks = updateListofLists(checks,valueMKenergy,dfindex,writecols.index('minMKenergy_values'))
     
     return checks
     
 
-def check4freqcontrol(inputdata,dfindex, mkpower, checks):
+def check4freqcontrol(inputdata,dfindex, mkpower, checks, writecols):
     
     checkLRpower = inputdata.power >= mkpower * 1.25
     valueLRpower = str(round(inputdata.power,4)) + '/' + str(round(mkpower*1.25,4))
     
-    checks = updateListofLists(checks,checkLRpower,dfindex,9)
-    checks = updateListofLists(checks,valueLRpower,dfindex,10)
+    checks = updateListofLists(checks,checkLRpower,dfindex,writecols.index('minLRpower'))
+    checks = updateListofLists(checks,valueLRpower,dfindex,writecols.index('minLRpower_values'))
     
     return checks
     
@@ -228,49 +218,54 @@ def updateListofLists(list,value,index,pos):
 
 def checkTimeWindow(inputdata, weeksection, timeslice):
 
+    outdata = inputdata
     # can choose between weekend (week), saturday (sat) and holiday and sunday (hol)
 
     #calculate the minimum connectivity in each of the hours of the window
     windowtime = 4
-    currentwindow = inputdata.connectivity[inputdata.id + "_" + weeksection][(timeslice-1)
+    currentwindow = outdata.connectivity[inputdata.id + "_" + weeksection][(timeslice-1)
     *windowtime:timeslice*windowtime]
     minconnect = min(currentwindow)
 
     # obtain minimum power and energy available for qualification
 
-    realenergy = inputdata.energy * minconnect
-    realpower = inputdata.power * minconnect
+    realenergy = outdata.energy * minconnect
+    realpower = outdata.power * minconnect
 
-    inputdata.energy = realenergy
-    inputdata.power = realpower
+    outdata.energy = realenergy
+    outdata.power = realpower
 
-    return inputdata
+    return outdata
 
-def checkControlReserve(data):
+def checkControlReserve(data, product):
 
-    if data.controlreserve == 'positive': # if we want positive control reserve, multiply by discharge efficiency
+    outdata = data #necessary due to the way variables work in python. This way, it will not modify also the values of the input data even when assigning a different variable to the function
+    # This way the input data "data" and what we give to return can become independen
+    
+    
+    if product == 'positive': # if we want positive control reserve, multiply by discharge efficiency
 
-        data.energy = data.energy * data.dischargeefficiency
-        data.power = data.power * data.dischargeefficiency
+        outdata.energy = outdata.energy * outdata.dischargeefficiency
+        outdata.power = outdata.power * outdata.dischargeefficiency
 
-    elif data.controlreserve == 'negative': #otherwise, by charging one
+    elif product == 'negative': #otherwise, by charging one
 
-        data.energy = data.energy * data.chargeefficiency
-        data.power = data.power * data.chargeefficiency
+        outdata.energy = outdata.energy * outdata.chargeefficiency
+        outdata.power = outdata.power * outdata.chargeefficiency
         
 
-    elif data.controlreserve == 'symmetric': # if we want both, then calculate both and check the minimum energy/power value. This is what ultimately will qualify
+    elif product == 'symmetric': # if we want both, then calculate both and check the minimum energy/power value. This is what ultimately will qualify
 
         
-        data.energy = data.energy * statistics.mean([data.chargeefficiency, data.dischargeefficiency])
+        outdata.energy = outdata.energy * statistics.mean([outdata.chargeefficiency, outdata.dischargeefficiency])
 
-        data.power = data.power * statistics.mean([data.chargeefficiency, data.dischargeefficiency])
+        outdata.power = outdata.power * statistics.mean([outdata.chargeefficiency, outdata.dischargeefficiency])
 
     else:
 
         raise NameError("Incorrect input string for checkControlReserve")
 
-    return data
+    return outdata
 
 
 def runTool():
@@ -282,12 +277,14 @@ def runTool():
     path = Path(os.getcwd()).parent
 
     input = readInput(path/'inputvalues.xlsx')
+    
+    writecols = list(pd.read_excel(path/'outputvalues.xlsx', 'output').columns)[2:] #get columns in which data is to be written in outputvalues. remove 2 initial elements
 
     ancillarydata = readAnService(path/'ancillaryservicevalues.xlsx', service)
 
     for i in range(len(input)):
     
-        checks = compareValues(input[i], ancillarydata, service, weeksection="hol", timeslice=2)
+        checks = compareValues(input[i], ancillarydata, service, writecols, weeksection="hol", timeslice=1)
 
         writeOutput(path/'outputvalues.xlsx', input[i].id, service, checks)
                 
