@@ -6,7 +6,7 @@ from pathlib import Path
 
 def compareValues(inputdata, servicedata, servicetype,**kwargs):
 
-    checks = [['-']]*9
+    checks = [['-']]*11
     
 
     # updating inputdata considering negative/positive power balancing
@@ -51,12 +51,11 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
                     
                     continue
             
-            print("Analyzing " + row.loc["product"] + " product.\n")
+            print("\nAnalyzing " + row.loc["product"] + " product.\n")
             
             # add product to check list
             
             checks = updateListofLists(checks,row[0],index,0)
-
 
             
             # CHECK1: check minimum bidding power is fulfilled
@@ -78,15 +77,10 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
                 
                 checks = check3freqcontrol(inputdata, row, index, mkpower, checks)
                 
-                
-                
                 #CHECK4: Maximum power when limited reservoir
                 
-                checkLRpower = inputdata.power >= mkpower * 1.25
-                valueLRpower = str(round(inputdata.power,4)) + '/' + str(round(mkpower*1.25,4))
+                checks = check4freqcontrol(inputdata, index, mkpower, checks)
                 
-                checks = updateListofLists(checks,checkLRpower,index,9)
-                checks = updateListofLists(checks,valueLRpower,index,10)
 
     elif servicetype == "redispatch":
 
@@ -103,6 +97,7 @@ def compareValues(inputdata, servicedata, servicetype,**kwargs):
         checks[1] = [checkpower]
 
     return checks
+
 
 def check1freqcontrol(inputdata, dfrow, dfindex, checks):
     
@@ -122,7 +117,7 @@ def check2freqcontrol(inputdata, dfrow, dfindex, checks):
                 
         checks = updateListofLists(checks,'-',dfindex,3)
         checks = updateListofLists(checks,'-',dfindex,4)
-        print("No minimum ramp required.")
+        print(" - No minimum ramp required.")
 
     else:
 
@@ -146,7 +141,7 @@ def check2freqcontrol(inputdata, dfrow, dfindex, checks):
             checks = updateListofLists(checks,checkrampup,dfindex,3)
             checks = updateListofLists(checks,valuerampup,dfindex,4)
             
-        return checks
+    return checks
             
             
             
@@ -161,7 +156,7 @@ def check3freqcontrol(inputdata, dfrow, dfindex, mkpower, checks):
 
         if dfrow.loc[cap] == '-': #if there is an x in the data, meaning that there is no minimum requirement
             
-            print("No minimum MK" + cap.split('_')[-1] + 
+            print(" - No minimum MK" + cap.split('_')[-1] + 
             " capacity requirement for " + dfrow.loc["product"] + "product.")
 
         elif "PQ" in cap: # if PQ is in the minimum capacity column name: if we are dealing with min PQ power conditions
