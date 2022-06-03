@@ -1,5 +1,7 @@
 import statistics
 
+from pyrsistent import s
+
 class inputInfo:
     def __init__(self):
         self.id = None
@@ -43,16 +45,21 @@ class inputInfo:
         
         if connectivity:
             
-            realvalue = realvalue * self.getMinConnectivity(self.weeksection, self.timeslice)
+            realvalue = realvalue * self.getMinConnectivityinWindow()
         
         return realvalue
     
     
-    def getMinConnectivity(self, weeksection,timeslice):
+    def getMinConnectivityinWindow(self):
         
         windowtime = 4
-        currentwindow = self.connectivity[self.id + "_" + weeksection][(timeslice-1)
-        *windowtime:timeslice*windowtime]
+        currentwindow = self.connectivity[self.id + "_" + self.weeksection][(self.timeslice-1)
+        *windowtime:self.timeslice*windowtime]
         minconnect = min(currentwindow)
         
         return minconnect
+    
+    def getMinConnectivity(self):
+        
+        mincon = min(self.connectivity.min())
+        
