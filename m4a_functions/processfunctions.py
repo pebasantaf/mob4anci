@@ -1,13 +1,8 @@
-import statistics
-from m4a_functions.readwritefunctions import *
-from m4a_functions.processfunctions import *
-import os
-from pathlib import Path
+from utils.Utils import *
 
-def compareValues(inputdata, servicedata, servicetype, writecols,**kwargs):
+def compareValues(inputdata, servicedata, servicetype, writecols):
 
-    checks = [['-']]*12
-    
+    checks = [['-']]*len(writecols)
 
     # updating inputdata considering negative/positive power balancing
 
@@ -41,11 +36,23 @@ def compareValues(inputdata, servicedata, servicetype, writecols,**kwargs):
             
             print("\nAnalyzing " + row.loc["product"] + " product.\n")
             
-            # add product to check list
+            # add product to checks list
             
             checks = updateListofLists(checks, row["product"], index, writecols.index('product'))
             checks = updateListofLists(checks, row["reservetype"], index, writecols.index('reservetype'))
+            
+            #if the input its a dash, stored weeksection and timeslice/hour of the max. connectivity
+            
+            if inputdata.weeksection == '-' or inputdata.timeslice == '-': 
+                
+                checks = updateListofLists(checks, inputdata.getMaxWindow()[1][1], index, writecols.index('weeksection'))
+                checks = updateListofLists(checks, inputdata.getMaxWindow()[1][0], index, writecols.index('timeslice'))
 
+            else: # else, you have input a specific timeslice/hour. Therefore, a dash is given as an ouput
+                
+                checks = updateListofLists(checks, '-', index, writecols.index('weeksection'))
+                checks = updateListofLists(checks, '-', index, writecols.index('timeslice'))
+                
             
             # CHECK1: check minimum bidding power is fulfilled
             
@@ -65,28 +72,20 @@ def compareValues(inputdata, servicedata, servicetype, writecols,**kwargs):
                 
                 checks = check3freqcontrol(realenergy, realpower, row, index, mkpower, checks, writecols)
                 
-                #CHECK4: Maximum power when limited reservoir
+                # CHECK4: Maximum power when limited reservoir
                 
                 checks = check4freqcontrol(realpower, index, mkpower, checks, writecols)
-                
 
-    elif servicetype == "redispatch":
-
-        # here, we only have 2 cases. If the storage is remotelty controllable or not.
-
-        if inputdata.remotecontrol:
-
-            checkpower = inputdata.power > servicedata.minimum_bid_power_1[0]
-
-        elif not inputdata.remotecontrol:
-
-            checkpower = inputdata.power > servicedata.minimum_bid_power_2[0]
-            
-        checks[1] = [checkpower]
-
+    # Check redispatch power
+    
+    elif servicetype == 'redispatch':
+        
+        checks = checkredispatchpower(checks, inputdata, servicedata, writecols)
+        
     return checks
 
 
+# CHECK1: check minimum bidding power is fulfilled
 
 def check1freqcontrol(realpower, product, dfindex, checks, writecols):
     
@@ -99,6 +98,8 @@ def check1freqcontrol(realpower, product, dfindex, checks, writecols):
     return checks
     
     
+# CHECK2: check if ramping requirement is fulfilled
+
 def check2freqcontrol(rampup, product, dfindex, checks, writecols):
     
     if product.ramp_up == '-': #no minimum ramp required
@@ -130,8 +131,9 @@ def check2freqcontrol(rampup, product, dfindex, checks, writecols):
             checks = updateListofLists(checks,valuerampup, dfindex, writecols.index('minRamp_values'))
             
     return checks
+      
             
-            
+# CHECK3: minimum energy to PQ and MK energy capacity           
             
 def check3freqcontrol(realenergy, realpower, product, dfindex, mkpower, checks, writecols):
 
@@ -188,6 +190,8 @@ def check3freqcontrol(realenergy, realpower, product, dfindex, mkpower, checks, 
     
     return checks
     
+    
+# CHECK4: Maximum power when limited reservoir
 
 def check4freqcontrol(realpower,dfindex, mkpower, checks, writecols):
     
@@ -199,42 +203,36 @@ def check4freqcontrol(realpower,dfindex, mkpower, checks, writecols):
     
     return checks
     
-
-def updateListofLists(list,value,index,pos):
-
-    # one index for each freq_control product and one pos for each check
-    if index == 0:
-
-        list[pos] = [value]
-
-    elif index > 0:
-
-        list[pos] +=[value]
-
-    return list
-
-
-def runTool():
-
-    servicelist = ['freq_control', 'redispatch']
-    service = servicelist 
     
-    
-    path = Path(os.getcwd()).parent
-
-    input = readInput(path/'inputvalues.xlsx')
-    
-    writecols = list(pd.read_excel(path/'outputvalues.xlsx', 'output').columns)[2:] #get columns in which data is to be written in outputvalues. remove 2 initial elements
-
-    ancillarydata = readAnService(path/'ancillaryservicevalues.xlsx', service)
-
-    for i in range(len(input)):
-    
-        checks = compareValues(input[i], ancillarydata, service, writecols, weeksection="hol", timeslice=1)
-
-        writeOutput(path/'outputvalues.xlsx', input[i].id, service, checks)
+# Check for redispatch power
                 
+def checkredispatchpower(checks, inputdata, servicedata,  writecols):
+    
+    # here, we only have 2 cases. If the storage is remotelty controllable or not.
+    maxcon = inputdata.getMaxConnectivity()[0]
+    powertocheck = inputdata.getRealValue('power', 'symmetric', False)
+    
+    if inputdata.weeksection == '-' or inputdata.timeslice == '-': 
+            
+        checks = updateListofLists(checks, inputdata.getMaxConnectivity()[1][1], 0, writecols.index('weeksection'))
+        checks = updateListofLists(checks, inputdata.getMaxConnectivity()[1][0], 0, writecols.index('timeslice'))
+    
+    
+    
+    if inputdata.remotecontrol:
+        
+        checkpower = powertocheck * maxcon > servicedata.minimum_bid_power_1[0]
+        valuepower = str(round((powertocheck * maxcon),4)) + '/' + str(round(servicedata.minimum_bid_power_1[0],4))
 
+    elif not inputdata.remotecontrol:
+
+        checkpower = powertocheck * maxcon > servicedata.minimum_bid_power_2[0]
+        valuepower = str(round((powertocheck * maxcon),4)) + '/' + str(round(servicedata.minimum_bid_power_2[0],4))
+    
+    checks = updateListofLists(checks, checkpower, 0, writecols.index('minPower'))
+    checks = updateListofLists(checks, valuepower, 0, writecols.index('minPower_values'))
+    
+    return checks
 
 
 
