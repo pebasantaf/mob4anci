@@ -23,8 +23,8 @@ def plotResults(cs, results, em_price, fleet):
     
     #balancing market
     
-    ax1.bar(range(cs.nr_timesteps), -results['bm']['P_im'], label='Balacing market imports')
-    ax1.bar(range(cs.nr_timesteps), -results['bm']['P_ex'], label='Balacing market exports')
+    ax1.bar(range(cs.nr_timesteps), -results['bm']['P_neg'], label='Balacing market imports')
+    ax1.bar(range(cs.nr_timesteps), -results['bm']['P_pos'], label='Balacing market exports')
     
     ax2 = ax1.twinx()
     

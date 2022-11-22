@@ -129,7 +129,7 @@ def writeLPbm(filedirectory, cs, em):
                 cost_pos = em.price_aFRR_cap_pos[i*4]
                 cost_neg = em.price_aFRR_cap_neg[i*4]
                 
-                f.write(" {0:+g} P_block{1:}_pos_bm  {2:+g} P_block{3:}_neg_bm)\n".format
+                f.write(" {0:+g} P_block{1:}_pos_bm  {2:+g} P_block{3:}_neg_bm\n".format
                         (-cost_pos, tstep[i*4] ,-cost_neg ,tstep[i*4]))
             
             f.close()
@@ -164,6 +164,64 @@ def writeLPbm(filedirectory, cs, em):
                     (tstep[i], tstep[j]))
             
         f.close()
+        
+        
+        
+    with open(filedirectory['cons'],'a') as f:
+    
+    # write constraints for operation modes 
+        P_im_min = em.P_im_min
+        for i in range(cs.nr_timesteps):
+            f.write("{:g} y_bm~{} - P_neg_bm~{} <= 0\n".format 
+            (P_im_min, tstep[i], tstep[i]))
+        P_im_max = em.P_im_max
+        for i in range(cs.nr_timesteps):
+            f.write(" P_neg_bm~{} - {:g} y_bm~{} <= 0\n".format 
+        (tstep[i], P_im_max, tstep[i]))
+
+        P_ex_min = em.P_ex_min
+        for i in range(cs.nr_timesteps):
+            f.write("{:g} y_bm~{} + P_pos_em~{} >= {:g}\n".format
+            (P_ex_min ,tstep[i], tstep[i] ,P_ex_min))        
+        P_ex_max = em.P_ex_max
+        for i in range(cs.nr_timesteps):
+            f.write(" {:g} y_bm~{}  + P_pos_em~{} <= {:g}\n".format
+            (P_ex_max ,tstep[i], tstep[i], P_ex_max))
+        
+
+        # close temporary optimization file 
+        f.close()
+
+    with open(filedirectory['bounds'],'a') as f:
+    
+    # write boundary conditions for market imports into file for each time step
+        lb = em.P_im_min
+        ub = em.P_im_max
+        for i in range(cs.nr_timesteps):
+            f.write("{:g} <= P_neg_bm~{} <= {:g}\n".format( lb ,tstep[i] ,ub))
+        
+        # write boundary conditions for market exports into file for each time step
+        lb = em.P_ex_min
+        ub = em.P_ex_max
+        for i in range(cs.nr_timesteps):
+            f.write("{:g} <= P_pos_bm~{} <= {:g}\n".format( lb, tstep[i] ,ub))
+        
+        # close temporary optimization file 
+        f.close()
+        
+    """ binaries"""
+    
+    # open temporary optimization file for binaries according to slide 45
+    with open(filedirectory['binaries'],'a') as f:
+    
+        # write binary into file for each time step
+        for i in range(cs.nr_timesteps):
+            f.write("y_bm~{}\n".format(tstep[i]))
+        
+        # close temporary optimization file 
+        f.close()
+        
+    
     
         
 def writeLPfleet(filedirectory, cs, fleet):
@@ -200,7 +258,8 @@ def writeLPfleet(filedirectory, cs, fleet):
     
         # get vectors for time increment, time steps and efficiency
         tincr =cs.time_increment
-        eff = fleet.chargeefficiency
+        cheff = fleet.chargeefficiency
+        dieff = fleet.dischargeefficiency
         
         # write non optimized charging power constraint (equation 7.06)
         for i in range(cs.nr_timesteps):
@@ -216,7 +275,7 @@ def writeLPfleet(filedirectory, cs, fleet):
         for k in range(1,cs.nr_timesteps):
             
             # expand string
-            P_d_esp_string = P_d_esp_string + "+ {:g} P_d_fleet~{} ".format(cs.time_increment * eff, k)
+            P_d_esp_string = P_d_esp_string + "+ {:g} P_d_fleet~{}".format(cs.time_increment * cheff, k)
             
             # write constraint into file
             f.write("E_d_esp_fleet~{} ".format(k+1) +  P_d_esp_string +"= {:g}\n".format (fleet.E_d_esp[k]))
@@ -226,7 +285,7 @@ def writeLPfleet(filedirectory, cs, fleet):
         # coverable energy demand (equation 7.09)
         for i in range(cs.nr_timesteps):
             f.write("{:g} P_d_fleet~{} - E_d_esp_fleet~{} <= 0\n".format
-            (tincr*eff ,tstep[i], tstep[i]))
+            (tincr*cheff ,tstep[i],tstep[i]))
         
         # iterate time steps of optimization period in order to 
         # write constraint of latest possible energy demand for 
@@ -234,9 +293,9 @@ def writeLPfleet(filedirectory, cs, fleet):
         P_d_lep_string = ''
         for k in range(cs.nr_timesteps):
             if (k==0):
-                P_d_lep_string = P_d_lep_string + "{:g} P_d_fleet~{} ".format(cs.time_increment*eff ,k+1)
+                P_d_lep_string = P_d_lep_string + "{:g} P_d_fleet~{}".format(cs.time_increment*cheff ,k+1)
             else:
-                P_d_lep_string = P_d_lep_string + "+ {:g} P_d_fleet~{} ".format(cs.time_increment*eff ,k+1)
+                P_d_lep_string = P_d_lep_string + "+ {:g} P_d_fleet~{}".format(cs.time_increment*cheff ,k+1)
 
            
             # write constraint into file
@@ -245,7 +304,7 @@ def writeLPfleet(filedirectory, cs, fleet):
         
     # write time frame constraint (equation 7.11)
         for i in range(cs.nr_timesteps):
-            f.write("{:g} P_d_fleet~{} <= {:g}\n".format(tincr*eff, tstep[i], fleet.E_d_flex[i]))
+            f.write("{:g} P_d_fleet~{} <= {:g}\n".format(tincr*cheff, tstep[i], fleet.E_d_flex[i]))
         
         # close temporary optimization file 
         f.close()
@@ -259,7 +318,7 @@ def writeLPfleet(filedirectory, cs, fleet):
         lb = 0
         ub = fleet.P_d_max
         for i in range(cs.nr_timesteps):
-            f.write("{:g} <= P_d_fleet~{} + P_pos_bm~{} + P_neg_bm~{} <= {:g}\n".format(lb ,tstep[i], tstep[i], tstep[i], ub[i]))
+            f.write("{:g} <= P_d_fleet~{} <= {:g}\n".format(lb ,tstep[i], ub[i]))
         
        
         # close temporary optimization file 
@@ -281,14 +340,16 @@ def writeLPadd(filedirectory, cs):
     with open(filedirectory['cons'],'a') as f:
     
     # write power equilibrium constraint into file for each time step
-        power_eqa ='P_im_em~{} - P_ex_em~{} - P_d_fleet~{} - P_neg_bm~{} + P_pos_bm~{} = 0\n'
+        power_eqa ='P_im_em~{} - P_ex_em~{} - P_d_fleet~{} + P_neg_bm~{} - P_pos_bm~{} = 0\n'
         for i in range(cs.nr_timesteps):
-            f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i] ,tstep[i] ,tstep[i] ,tstep[i] ,tstep[i] ,tstep[i] ,tstep[i] ,tstep[i] ,tstep[i]))
+            f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i] ,tstep[i]))
 
-        '''        # write EnFluRi constraint (equation 3.24)
+
+              # write EnFluRi constraint (equation 3.24)
         for i in range(cs.nr_timesteps):
-            f.write( "y_bat~{} + y_em~{} =1\n".format(tstep[i] ,tstep[i]))
+            f.write( "y_bm~{} + y_em~{} =1\n".format(tstep[i] ,tstep[i]))
         # close temporary optimization file
+
+
         
-        '''
         f.close()
