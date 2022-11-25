@@ -109,8 +109,8 @@ def writeLPbm(filedirectory, cs, em):
             for i in range(cs.nr_timesteps):
                 cost_pos = em.price_aFRR_en_pos[i]  
                 cost_neg = em.price_aFRR_en_neg[i]
-                f.write(" {0:+g} P_pos_bm~{1:}  {2:+g} P_neg_bm~{3:} \n".format
-                        (-cost_pos*cs.time_increment, tstep[i] ,-cost_neg*cs.time_increment ,tstep[i])) 
+                f.write("  {0:+g} P_neg_bm~{1:} \n".format
+                        (-cost_neg*cs.time_increment ,tstep[i])) 
                 
                 #NOTE: the power is positive an the cost is negative. But we set the minus already in the formula and not in the cost because else we write -+ [number], as we are writing a 
                 #string and + and - wont get multiplied
@@ -139,6 +139,7 @@ def writeLPbm(filedirectory, cs, em):
     
     with open(filedirectory['cons'],'a') as f:
         
+        '''
         # here we must limit the power P_xx_bm to the power of the block, so this power is the same in all the periods
         for i in range(cs.nr_timesteps):
             
@@ -150,7 +151,7 @@ def writeLPbm(filedirectory, cs, em):
                     (tstep[i], tstep[j]))
             
         f.close()
-        
+        '''
     with open(filedirectory['cons'],'a') as f:
         
         # here we must limit the power P_xx_bm to the power of the block, so this power is the same in all the periods
@@ -179,6 +180,7 @@ def writeLPbm(filedirectory, cs, em):
             f.write(" P_neg_bm~{} - {:g} y_bm~{} <= 0\n".format 
         (tstep[i], P_im_max, tstep[i]))
 
+        '''
         P_ex_min = em.P_ex_min
         for i in range(cs.nr_timesteps):
             f.write("{:g} y_bm~{} + P_pos_em~{} >= {:g}\n".format
@@ -187,7 +189,7 @@ def writeLPbm(filedirectory, cs, em):
         for i in range(cs.nr_timesteps):
             f.write(" {:g} y_bm~{}  + P_pos_em~{} <= {:g}\n".format
             (P_ex_max ,tstep[i], tstep[i], P_ex_max))
-        
+        '''
 
         # close temporary optimization file 
         f.close()
@@ -200,12 +202,13 @@ def writeLPbm(filedirectory, cs, em):
         for i in range(cs.nr_timesteps):
             f.write("{:g} <= P_neg_bm~{} <= {:g}\n".format( lb ,tstep[i] ,ub))
         
+        '''
         # write boundary conditions for market exports into file for each time step
         lb = em.P_ex_min
         ub = em.P_ex_max
         for i in range(cs.nr_timesteps):
             f.write("{:g} <= P_pos_bm~{} <= {:g}\n".format( lb, tstep[i] ,ub))
-        
+        '''
         # close temporary optimization file 
         f.close()
         
@@ -340,16 +343,16 @@ def writeLPadd(filedirectory, cs):
     with open(filedirectory['cons'],'a') as f:
     
     # write power equilibrium constraint into file for each time step
-        power_eqa ='P_im_em~{} - P_ex_em~{} - P_d_fleet~{} + P_neg_bm~{} - P_pos_bm~{} = 0\n'
+        power_eqa ='P_im_em~{} - P_ex_em~{} - P_d_fleet~{} + P_neg_bm~{}= 0\n'
         for i in range(cs.nr_timesteps):
-            f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i] ,tstep[i]))
+            f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i]))
 
-
+        '''
               # write EnFluRi constraint (equation 3.24)
         for i in range(cs.nr_timesteps):
             f.write( "y_bm~{} + y_em~{} =1\n".format(tstep[i] ,tstep[i]))
         # close temporary optimization file
-
+        '''
 
         
         f.close()
