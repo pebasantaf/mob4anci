@@ -19,7 +19,7 @@ def sortResults(cs, cpx_sol, cpx_var):
                          'P_d':[],
                          'E_d_esp':[]},
                
-               'bm': {'P_pos':[],
+               'bm': {
                       'P_neg':[]},
                }
     

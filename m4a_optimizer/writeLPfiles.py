@@ -129,17 +129,17 @@ def writeLPbm(filedirectory, cs, em):
                 cost_pos = em.price_aFRR_cap_pos[i*4]
                 cost_neg = em.price_aFRR_cap_neg[i*4]
                 
-                f.write(" {0:+g} P_block{1:}_pos_bm  {2:+g} P_block{3:}_neg_bm\n".format
-                        (-cost_pos, tstep[i*4] ,-cost_neg ,tstep[i*4]))
+                f.write("{0:+g} P_block{1:}_neg_bm\n".format
+                        (-cost_neg ,tstep[i*4]))
             
             f.close()
             
         
     #constrains
-    
+    '''
     with open(filedirectory['cons'],'a') as f:
         
-        '''
+        
         # here we must limit the power P_xx_bm to the power of the block, so this power is the same in all the periods
         for i in range(cs.nr_timesteps):
             
@@ -343,9 +343,9 @@ def writeLPadd(filedirectory, cs):
     with open(filedirectory['cons'],'a') as f:
     
     # write power equilibrium constraint into file for each time step
-        power_eqa ='P_im_em~{} - P_ex_em~{} - P_d_fleet~{} + P_neg_bm~{}= 0\n'
+        power_eqa ='P_im_em~{} - P_ex_em~{} - P_d_fleet~{} - P_d_nonopt_fleet~{} + P_neg_bm~{}= 0\n'
         for i in range(cs.nr_timesteps):
-            f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i]))
+            f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i], tstep[i]))
 
         '''
               # write EnFluRi constraint (equation 3.24)

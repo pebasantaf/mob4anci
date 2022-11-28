@@ -19,12 +19,13 @@ def plotResults(cs, results, em_price, fleet):
     fig, ax1 = plt.subplots()
     
     ax1.bar(range(cs.nr_timesteps), -results['fleet']['P_d'], label='Fleet demand')
+    ax1.bar(range(cs.nr_timesteps), -results['fleet']['P_d_nonopt'], label='Non optimized fleet demand')
     ax1.bar(range(cs.nr_timesteps), results['em']['P_im'], label='Market imports')
     
     #balancing market
     
-    ax1.bar(range(cs.nr_timesteps), -results['bm']['P_neg'], label='Balacing market imports')
-    ax1.bar(range(cs.nr_timesteps), -results['bm']['P_pos'], label='Balacing market exports')
+    ax1.bar(range(cs.nr_timesteps), results['bm']['P_neg'], label='Balacing market imports')
+
     
     ax2 = ax1.twinx()
     
