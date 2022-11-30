@@ -3,7 +3,7 @@
 data/
 
 # Byte-compiled / optimized / DLL files
-m4a_optimizer/__pycache__/
+.__pycache__/
 *.py[cod]
 pycache/*
 
