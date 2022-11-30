@@ -180,6 +180,10 @@ def writeLPbm(filedirectory, cs, em):
             f.write(" P_neg_bm~{} - {:g} y_bm~{} <= 0\n".format 
         (tstep[i], P_im_max, tstep[i]))
 
+        for i in range(cs.nr_timesteps):
+            f.write(" P_neg_bm~{} <= 200\n".format 
+        (tstep[i]))
+
         '''
         P_ex_min = em.P_ex_min
         for i in range(cs.nr_timesteps):
@@ -347,12 +351,12 @@ def writeLPadd(filedirectory, cs):
         for i in range(cs.nr_timesteps):
             f.write( power_eqa.format(tstep[i], tstep[i], tstep[i], tstep[i], tstep[i]))
 
-        '''
+
               # write EnFluRi constraint (equation 3.24)
         for i in range(cs.nr_timesteps):
-            f.write( "y_bm~{} + y_em~{} =1\n".format(tstep[i] ,tstep[i]))
+            f.write( "y_bm~{} - y_em~{}=0\n".format(tstep[i] ,tstep[i]))
         # close temporary optimization file
-        '''
+
 
         
         f.close()
