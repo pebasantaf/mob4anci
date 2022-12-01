@@ -57,6 +57,8 @@ class FleetOperator:
     
     def demandmat2excel(self, matpath, inputid):
         
+        ''' demand from mat file to inputvalues excel'''
+        
         matfile = scio.loadmat(matpath)
         
         valuesresolution = matfile['iLMS2VPP_week'][0,0] #<-- set the array you want to access. 
@@ -487,7 +489,7 @@ class electricityMarket:
                 
                 data = pd.read_csv(path, sep=';')
                 
-                data = data.replace('-',0, regex=True) #replace - with zeros. For us , if there was no volume traded it is the same as a 0
+                data = data.replace('-',np.nan, regex=True) #replace - with zeros. For us , if there was no volume traded it is the same as a 0
                 
                 # turn date and time into datetime format
                 
@@ -510,10 +512,9 @@ class electricityMarket:
                         except ValueError:
                             
                             data[col] = data[col].str.replace(',', '').astype(float)
-                
-                # fill nans with zeros
-                
-                data = data.fillna(0)
+                    
+                    colmean = round(data[col].mean(), 3) #calculate mean of column
+                    data[col] = data[col].fillna(colmean) #fill nans with that mean
                         
                 #NOTE: Add data 4 by 4 to get hourly. then store. Important: Values change so much every 15 min cause volume if bidded for 4 hours but might be activated or not. 
 
@@ -537,7 +538,12 @@ class electricityMarket:
             
                     row[powercols] = sum(data.loc[index*4:(index+1)*4-1,powercols].values)
                     row[pricecols] =  np.mean(data.loc[(index)*4:(index+1)*4-1,pricecols].values, axis=0)
-                    
+                
+                #change names in hourlydata columns so we can match it
+                
+                hourlydata.columns = [text.replace('MW', 'kW') for text in hourlydata.columns]
+                
+                
                 # different cases for FCR, aFRR and mFRR     
                 
                 if 'Automatic_Frequency_Restoration_Reserve' in path:
@@ -551,12 +557,14 @@ class electricityMarket:
                     
                     for col in hourlydata.columns[2:]:
                         
-                        targetdf['aFRR-' + col] = hourlydata[col]
+                        
+                        targetdf['aFRR-' + col] = hourlydata[col]/1000 #we change MW to kW
 
-
+            #change MW to kW in column names
+            
             targetdf.to_excel(writer, 'balancing_market', index=False)
             
-            #writer.save() #Adding this line produces a corruppted excel that must be repaird
+            #writer.save() #Adding this line produces a corruppted excel that must be repaired
                     
             return targetdf
             
@@ -569,11 +577,11 @@ class electricityMarket:
         
         #this is momentaneously hardcoded
         
-        self.price_aFRR_cap_pos = bmdata['aFRR-Procurement price (+)[€/MW]'].values
-        self.price_aFRR_cap_neg = bmdata['aFRR-Procurement price (-)[€/MW]'].values
+        self.price_aFRR_cap_pos = bmdata['aFRR-Procurement price (+)[€/kW]'].values
+        self.price_aFRR_cap_neg = bmdata['aFRR-Procurement price (-)[€/kW]'].values
         
-        self.price_aFRR_en_pos = bmdata['aFRR-Activation price (+)[€/MWh]'].values
-        self.price_aFRR_en_neg = bmdata['aFRR-Activation price (-)[€/MWh]'].values
+        self.price_aFRR_en_pos = bmdata['aFRR-Activation price (+)[€/kWh]'].values
+        self.price_aFRR_en_neg = bmdata['aFRR-Activation price (-)[€/kWh]'].values
         
         print()
         

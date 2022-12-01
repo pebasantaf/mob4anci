@@ -16,7 +16,7 @@ vpp = VirtualPowerPlant()
 service = ancillaryService()
 fp = FleetOperator()
 
-#fp.demandmat2excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\iLMS2VPP_Depot.mat", 'bus1')
+fp.demandmat2excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\iLMS2VPP_Depot.mat", 'bus1')
 
 inputs = fp.createFleetObjects()
 em = electricityMarket()
