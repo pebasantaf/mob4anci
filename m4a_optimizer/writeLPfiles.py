@@ -14,8 +14,8 @@ def writeLPem(filedirectory, cs, em):
 
             for i in range(cs.nr_timesteps):
                 cost = em.price_em[i]   #removed [0] as shape is different in my case
-                f.write("+ {:g} P_im_em~{} - {:g} P_ex_em~{}\n".format
-                    (cost*cs.time_increment, tstep[i], cost*cs.time_increment, tstep[i]))
+                f.write("{0:+g} P_im_em~{1:}  {2:+g} P_ex_em~{3:}\n".format(
+                    cost*cs.time_increment, tstep[i], -cost*cs.time_increment, tstep[i]))
             
         elif (cs.objective_function==2): # CO2 optimization
            
@@ -234,6 +234,22 @@ def writeLPbm(filedirectory, cs, em):
 def writeLPfleet(filedirectory, cs, fleet):
     tstep = np.array(range(1,cs.nr_timesteps+1))
     """objective variables"""
+    
+    #update fleet energy values with storage capacity and 
+    
+    for atr in fleet.__dict__.keys():
+        
+        if 'E_d' in atr:
+            
+            setattr(fleet,atr, np.array(getattr(fleet, atr))*fleet.energy*1000) #update with values of the whole fleet energy in kwh
+            
+        elif 'P_d' in atr:
+            
+            setattr(fleet,atr, np.array(getattr(fleet, atr))*fleet.power*1000) #update with values of the whole fleet energy in kw
+            
+        else:
+            
+            continue
     
     # open temporary optimization file for objective function
     with open(filedirectory['obj'],'a') as f:

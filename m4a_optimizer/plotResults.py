@@ -7,7 +7,7 @@ class.
 """
 from ipaddress import collapse_addresses
 import matplotlib.pyplot as plt
-def plotResults(cs, results, em_price, fleet):
+def plotResults(cs, results, em, fleet):
     """## create electrical power matrices"""
     
     energy_result = []
@@ -24,24 +24,27 @@ def plotResults(cs, results, em_price, fleet):
     ax1.bar(range(cs.nr_timesteps), -results['em']['P_ex'],bottom=-results['fleet']['P_d'] -results['fleet']['P_d_nonopt'],
             label='Market exports')
     
-    ax1.bar(range(cs.nr_timesteps), results['em']['P_im'], label='Market imports')
+    # Market imports
     
-    #balancing market
+    ax1.bar(range(cs.nr_timesteps), results['bm']['P_neg'], label='Balacing market imports', color='pink')
+    ax1.bar(range(cs.nr_timesteps), results['em']['P_im'], bottom=results['bm']['P_neg'], label='Market imports')
     
-    ax1.bar(range(cs.nr_timesteps), results['bm']['P_neg'], label='Balacing market imports')
-
+    #prices
     
     ax2 = ax1.twinx()
     
-    ax2.plot(range(len(em_price)), em_price, label='Market price', color='black')
+    ax2.plot(range(cs.nr_timesteps), em.price_em, label='DA market price', color='black', alpha=0.7)
+    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_en_neg,'--', label='BM energy price (+)', color='black', alpha=0.7)
+    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_cap_neg,':', label='BM capacity price (+)', color='black', alpha=0.7)
+    
     
     ax1.set_xlabel('Time (h)')
-    ax1.set_ylabel('Power (MW)')
+    ax1.set_ylabel('Power (kW)')
     ax2.set_ylabel('Marke price (€/kWh)')
     ax1.grid()
     
-    ax1.legend()
-    ax2.legend()
+    ax1.legend(loc='upper left')
+    ax2.legend(loc='upper right')
     
     
     fig2 = plt.figure()

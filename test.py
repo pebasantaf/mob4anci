@@ -15,11 +15,17 @@ vpp = VirtualPowerPlant()
 
 service = ancillaryService()
 fp = FleetOperator()
+em = electricityMarket()
+cs = setCS()
 
-fp.demandmat2excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\iLMS2VPP_Depot.mat", 'bus1')
+#em.dayAheadData2Excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\mob4anci\data\price_em_year.mat")
+
+#fp.demand2Excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\mob4anci\data\iLMS2VPP_Depot.mat", 'bus1')
+
+
 
 inputs = fp.createFleetObjects()
-em = electricityMarket()
+
 
 
 afrrfile = 'Automatic_Frequency_Restoration_Reserve_202201010000_202201082359' + '.csv'
@@ -29,7 +35,7 @@ em.setBalancingMarketAttributes()
 
 #em.storeReserveMarketData(afrrpath)
 
-cs = setCS()
+
 results, fleet, em = fp.setValuesForOptimization()
 
 for res in results:
@@ -42,7 +48,7 @@ for res in results:
     
 
     
-    plotResults(cs, timeseries, em.price_em, fleet)
+    plotResults(cs, timeseries, em, fleet)
     
 
 em.setMarketAttributes('price_em')

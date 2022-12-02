@@ -55,7 +55,7 @@ class FleetOperator:
     outpath = os.path.join(Path(os.getcwd()).parent, 'outputvalues.xlsx')
     lpfiledirectory = os.path.join(os.getcwd(), "data")
     
-    def demandmat2excel(self, matpath, inputid):
+    def demand2Excel(self, matpath, inputid):
         
         ''' demand from mat file to inputvalues excel'''
         
@@ -113,20 +113,20 @@ class FleetOperator:
         
         fleetobjects = dict.fromkeys(data.id.values)
         
-        for key in fleetobjects:
+        for key in fleetobjects:  #for every fleet object name
 
             fleetobjects[key] = electricFleet() #store the object in the dictionary
             items = fleetobjects[key].__dict__.keys() #get all the attributes of the object
 
 
-            for variable in items:
+            for variable in items: #iterate over the attributes
 
                 if variable =='connectivity': #if we wanna get the connectivity, we use a special call cause it is a larger dataset
 
                     cols = [key + '_' + day for day in dayoption]
                     connectivity = pd.read_excel(self.path, 'connectivity', index_col=0).loc[:,cols]
 
-                elif 'E_d' in variable or 'P_d' in variable:
+                elif 'E_d' in variable or 'P_d' in variable: # the energy for the optimization also has a specific case
                     
                     #get list of columns with correct id
                     
@@ -281,6 +281,7 @@ class electricFleet:
         self.id = None
         self.storagetype = None
         self.chargetype = None
+        self.nr_vehicles = None
         self.chargeefficiency = None
         self.dischargeefficiency = None
         self.energy = None
@@ -452,7 +453,30 @@ class electricityMarket:
         self.price_aFRR_en_pos = None
         self.price_aFRR_en_neg = None
         self.price_mFRR_en = None
+    
+    def dayAheadData2Excel(self, matfile):
         
+        matfile = scio.loadmat(matfile)
+        
+        #find in which position is dayahead market
+        
+        descriptions = [text[0] for text in matfile['description_em'][0]]
+        mask = ['Day-Ahead' in name for name in descriptions]
+        
+        price = [round(values[mask][0], 4) for values in matfile['price_em']]
+        
+        wb = load_workbook(self.file)
+        sheet = wb['spot_market']
+        
+        for i in range(round(len(price)/4)):
+            
+            sheet.cell(row=i+2, column=1).value = price[i*4]
+            
+        wb.save(self.file)
+
+
+        
+    
     def setGeneralMarketAttributes(self):
         
         generaldata = pd.read_excel(self.file, 'general_data')
@@ -471,8 +495,13 @@ class electricityMarket:
 
         self.price_em = price.spot_price.values.tolist()[:limittime]
      
+    #def storeDayAheadMarketData(self,datapath):
+        
+        
     
     def storeReserveMarketData(self, datapaths):
+        
+        ''' stored the data obtained from SMARD application with balancing market data'''
         
         #datapath must be a list of paths
         
