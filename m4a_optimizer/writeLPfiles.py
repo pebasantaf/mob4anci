@@ -166,7 +166,14 @@ def writeLPbm(filedirectory, cs, em):
             
         f.close()
         
+    with open(filedirectory['cons'],'a') as f:
         
+        for i in range(cs.nr_timesteps):
+            
+            f.write('P_neg_bm~{} - P_d_fleet~{} <= 0\n'.format(
+                tstep[i], tstep[i]))
+            
+        f.close()
         
     with open(filedirectory['cons'],'a') as f:
     
