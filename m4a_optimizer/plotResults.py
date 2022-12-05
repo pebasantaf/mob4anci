@@ -34,8 +34,8 @@ def plotResults(cs, results, em, fleet):
     ax2 = ax1.twinx()
     
     ax2.plot(range(cs.nr_timesteps), em.price_em, label='DA market price', color='black', alpha=0.7)
-    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_en_neg,'--', label='BM energy price (+)', color='black', alpha=0.7)
-    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_cap_neg,':', label='BM capacity price (+)', color='black', alpha=0.7)
+    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_en_neg,'--', label='aFRR energy price (-)', color='black', alpha=0.7)
+    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_cap_neg,':', label='aFRR capacity price (-)', color='black', alpha=0.7)
     
     
     ax1.set_xlabel('Time (h)')

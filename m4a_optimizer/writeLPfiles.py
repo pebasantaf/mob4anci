@@ -180,9 +180,7 @@ def writeLPbm(filedirectory, cs, em):
             f.write(" P_neg_bm~{} - {:g} y_bm~{} <= 0\n".format 
         (tstep[i], P_im_max, tstep[i]))
 
-        for i in range(cs.nr_timesteps):
-            f.write(" P_neg_bm~{} <= 200\n".format 
-        (tstep[i]))
+       
 
         '''
         P_ex_min = em.P_ex_min
