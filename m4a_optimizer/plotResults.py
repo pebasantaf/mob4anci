@@ -7,8 +7,15 @@ class.
 """
 from ipaddress import collapse_addresses
 import matplotlib.pyplot as plt
-def plotResults(cs, results, em, fleet):
+import matplotlib as mpl
+def plotResults(cs, results, em, fleet, figname):
     """## create electrical power matrices"""
+    
+    font = {'family': 'Times New Roman'}
+
+    plt.style.use('classic')
+    mpl.rc('lines', linewidth=2)
+    mpl.rcParams['patch.edgecolor'] = "none"
     
     energy_result = []
     
@@ -33,19 +40,25 @@ def plotResults(cs, results, em, fleet):
     
     ax2 = ax1.twinx()
     
-    ax2.plot(range(cs.nr_timesteps), em.price_em, label='DA market price', color='black', alpha=0.7)
-    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_en_neg,'--', label='aFRR energy price (-)', color='black', alpha=0.7)
-    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_cap_neg,':', label='aFRR capacity price (-)', color='black', alpha=0.7)
+    ax2.plot(range(cs.nr_timesteps), em.price_em, label='DA market price', color='black')
+    ax2.plot(range(cs.nr_timesteps), em.price_aFRR_en_neg,'--', label='aFRR energy price (-)', color='black')
+    line1, = ax2.plot(range(cs.nr_timesteps), em.price_aFRR_cap_neg, label='aFRR capacity price (-)', color='black')
     
+    line1.set_dashes([2, 2, 10, 2]) 
     
     ax1.set_xlabel('Time (h)')
     ax1.set_ylabel('Power (kW)')
     ax2.set_ylabel('Marke price (€/kWh)')
+    ax1.margins(0.05)
+    ax2.margins(0.05)
     ax1.grid()
     
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='upper right')
+    ax1.legend(loc='upper left', framealpha=0.5)
+    ax2.legend(loc='upper right', framealpha=0.5)
     
+    fig.set_size_inches(18.5, 10.5)
+    
+    plt.savefig(r'results/market_allocation_' + figname + '.png', dpi=100)
     
     fig2 = plt.figure()
     
@@ -60,9 +73,17 @@ def plotResults(cs, results, em, fleet):
     plt.plot(range(cs.nr_timesteps), energy_result, label='E_result')
     #plt.plot(range(len(energyesp)), energyesp, label='Energy esp from results')
     
-    plt.legend()
+    plt.legend(loc='upper left', framealpha=0.5)
     plt.xlabel('Time (h)')
     plt.ylabel('Energy (kWh)')
+    plt.margins(0.05)
+    plt.grid()
+    
+    fig2.set_size_inches(18.5, 10.5)
+    plt.savefig(r'results/test_' + figname+ '.png', dpi=100)
+    
     plt.show()
     
-    print()
+    
+    
+    

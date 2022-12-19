@@ -5,38 +5,32 @@ from m4a_optimizer.sortresults import sortResults
 from pathlib import Path
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
 
 path = Path(os.getcwd()).parent
 ancillarydata = os.path.join(path, 'ancillaryservicevalues.xlsx')
 servicelist = ['freq_control', 'redispatch']
 
 vpp = VirtualPowerPlant()
-
 service = ancillaryService()
 fp = FleetOperator()
 em = electricityMarket()
 cs = setCS()
 
-#em.dayAheadData2Excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\mob4anci\data\price_em_year.mat")
 
-#fp.demand2Excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\mob4anci\data\iLMS2VPP_Depot.mat", 'bus1')
+cs.setNrTimesteps(24*7)
 
+#em.dayAheadData2Excel(r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\mob4anci\data\price_em_year.mat", "2018-01-01", 8760)
 
+#fp.demand2Excel( r"C:\Users\Usuario\Documents\Trabajo\TU Berlin\E-mobility flexiblity potential\mob4anci\data\iLMS2VPP_Depot.mat", 'iLMS2VPP_year','bus1')
 
-inputs = fp.createFleetObjects()
-
-
-
-afrrfile = 'Automatic_Frequency_Restoration_Reserve_202201010000_202201082359' + '.csv'
-afrrpath = [os.path.join(path, 'mob4anci', 'data', afrrfile)]
-
-em.setBalancingMarketAttributes()
-
-#em.storeReserveMarketData(afrrpath)
+em.setGeneralMarketAttributes("2018-08-01", cs)
 
 
-results, fleet, em = fp.setValuesForOptimization()
+#em.balancingMarketData2Excel(bmtype='aFRR',quart2hour=False)
+
+em.setBalancingMarketAttributes('aFRR', '08-01',cs)
+
+results, fleet= fp.setValuesForOptimization(cs, em)
 
 for res in results:
     i = results.index(res)
@@ -48,13 +42,13 @@ for res in results:
     
 
     
-    plotResults(cs, timeseries, em, fleet)
+    plotResults(cs, timeseries, em, fleet, 'week2')
     
 
 em.setMarketAttributes('price_em')
 
 
-
+inputs = fp.createFleetObjects()
 
 freqcontrol = service.getFreqcontrolObject()
 redispatch = service.getRedispatchObject()

@@ -41,3 +41,8 @@ class setCS():
 
 
         self.file_directionary  = os.getcwd()
+    
+    def setNrTimesteps(self, steps):
+        
+        self.nr_timesteps = steps
+        

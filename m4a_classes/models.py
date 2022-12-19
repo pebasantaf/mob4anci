@@ -11,6 +11,8 @@ from m4a_optimizer.setCS import setCS
 from openpyxl import workbook, load_workbook
 import scipy.io as scio
 from datetime import datetime
+import warnings
+from functools import reduce
 
 class VirtualPowerPlant:
     
@@ -55,48 +57,62 @@ class FleetOperator:
     outpath = os.path.join(Path(os.getcwd()).parent, 'outputvalues.xlsx')
     lpfiledirectory = os.path.join(os.getcwd(), "data")
     
-    def demand2Excel(self, matpath, inputid):
+    def demand2Excel(self,  matpath, dataset, inputid):
         
         ''' demand from mat file to inputvalues excel'''
         
         matfile = scio.loadmat(matpath)
         
-        valuesresolution = matfile['iLMS2VPP_week'][0,0] #<-- set the array you want to access. 
-        keys = matfile['iLMS2VPP_week'][0,0].dtype.descr
+        valuesresolution = matfile[dataset][0,0] #<-- set the array you want to access. 
+        keys = matfile[dataset][0,0].dtype.descr
 
         timeseries = valuesresolution['tincr_60'][0][0]
         matfilecolumns = valuesresolution['tincr_60'][0].dtype.descr
         columns = ['E_d_esp', 'E_d_lep', 'E_d_flex', 'P_d_max', 'P_d_nonopt']
         cols2write = [col + '_' + inputid for col in columns]
         
+        #load workbook
+        
         wb = load_workbook(self.path)
         sheet = wb['demand']
+        
+        #get current columns in excel
+        currentcols = [element.value for element in list(sheet.rows)[0]]
+        
+        #get mask that indicates if columns already exist or not
+        
+        coincidentcols = ['bus1' in col for col in currentcols]
+        
         
         for i in range(len(columns)):
             
             maxcol = sheet.max_column
             
-            sheet.cell(row=1, column=maxcol+1).value = cols2write[i]
+            #if there is any true value in coincident columns
             
+            if any(coincidentcols): 
+                
+                colindex = currentcols.index(cols2write[i]) + 1
+            
+            #if not, the index is just the one of the next empty cell
+            else:
+                
+                colindex = maxcol + 1
+                sheet.cell(row=1, column=colindex).value = cols2write[i] #and we create the column name
+            
+            #NOTE: plus 1 necessary due to different index numbering between excel and python
             
             listofvalues = list(np.concatenate(np.abs(timeseries[i]), axis=0))
             
+            #fill in the data
             for j in range(len(listofvalues)):
                 
-                sheet.cell(row=j+2, column=maxcol+1).value = listofvalues[j]
+                sheet.cell(row=j+2, column=colindex).value = listofvalues[j]
         
         wb.save(self.path)
 
-        '''
-        # Assemble the keys and values into variables with the same name as that used in MATLAB
-        for i in range(len(keys)):
-            key = keys[i][0]
-            val = np.squeeze(vals[key][0][0])  # squeeze is used to covert matlat (1,n) arrays into numpy (1,) arrays. 
-            exec(key + '=val')
-        print()
-        
-        '''
-    def createFleetObjects(self): 
+
+    def createFleetObjects(self, cs): 
         
         #read input values for the fleet and demand values
         data = pd.read_excel(self.path, 'input')
@@ -106,8 +122,7 @@ class FleetOperator:
         
         #get number of timesteps to limit size of optimization
         
-        CSset =setCS()
-        limittime = CSset.nr_timesteps
+        limittime = cs.nr_timesteps
         
         dayoption = ['week', 'sat', 'hol'] #workweek, saturday, holiday/sunday
         
@@ -133,11 +148,12 @@ class FleetOperator:
                     idcolumns = [col for col in demand.columns if 'bus1' in col]
                     currentdf = demand[idcolumns]
 
+                    #get the current variable we are handling from the data of the current id
                     currentvariable = [v for v in idcolumns if variable in v]
                     
                     valueslistoflist = currentdf[currentvariable].values.tolist()[:limittime]
                     
-                    goodvalues = [item for sublist in valueslistoflist for item in sublist]
+                    goodvalues = [item for sublist in valueslistoflist for item in sublist] #fix format, as valueslistoflist makes list of list and not just a list with values
                     
                     setattr(fleetobjects[key], variable ,goodvalues)
 
@@ -242,18 +258,17 @@ class FleetOperator:
         
         return checks
 
-    def setValuesForOptimization(self):   # NOTE: UNIFINSHED
+    def setValuesForOptimization(self, cs, em):  
         
         #Vpp_name_list =['fleet','em']
         results = []
-        em = electricityMarket()
-        em.setGeneralMarketAttributes()
-        em.setBalancingMarketAttributes()
+
+        #em.setGeneralMarketAttributes()
+        #em.setBalancingMarketAttributes()
         
-        fleet = self.createFleetObjects()
+        fleet = self.createFleetObjects(cs)
         
         directories = getLPFileDirectories(self.lpfiledirectory,'VPP')
-        cs = setCS()
         
         writeLPem(directories, cs, em)
         writeLPbm(directories, cs, em)
@@ -269,7 +284,7 @@ class FleetOperator:
             
             results += [vpp.cplexOptimization(directories)]
         
-        return results, fleet, em
+        return results, fleet
 
 
     
@@ -397,6 +412,7 @@ class electricFleet:
 class electricityMarket:
     
     file = pd.ExcelFile(os.path.join(Path(os.getcwd()).parent, 'electricitymarketvalues.xlsx'))
+    bmdatapath = os.path.join(os.getcwd(), 'data\\bmdata\\')
     
     def __init__(
         self,
@@ -454,7 +470,7 @@ class electricityMarket:
         self.price_aFRR_en_neg = None
         self.price_mFRR_en = None
     
-    def dayAheadData2Excel(self, matfile):
+    def dayAheadData2Excel(self, matfile, startdate, numstamps):
         
         matfile = scio.loadmat(matfile)
         
@@ -464,48 +480,61 @@ class electricityMarket:
         mask = ['Day-Ahead' in name for name in descriptions]
         
         price = [round(values[mask][0], 4) for values in matfile['price_em']]
+        dates = pd.date_range(start=startdate,periods=numstamps, freq="60min")
         
         wb = load_workbook(self.file)
         sheet = wb['spot_market']
         
-        for i in range(round(len(price)/4)):
+        
+        for i in range(numstamps):
             
-            sheet.cell(row=i+2, column=1).value = price[i*4]
+            sheet.cell(row=i+2, column=1).value = str(dates[i]).split(' ')[0]
+            sheet.cell(row=i+2, column=2).value = str(dates[i]).split(' ')[1]
+            sheet.cell(row=i+2, column=3).value = price[i*4]
             
         wb.save(self.file)
 
 
         
     
-    def setGeneralMarketAttributes(self):
+    def setGeneralMarketAttributes(self, initdata, cs):
+        
+        ''' set the general market attributes and the day ahead price from excel in the object'''
         
         generaldata = pd.read_excel(self.file, 'general_data')
         
         for key in generaldata.columns:
             
             setattr(self, key, generaldata.loc[0,key])
-
             
         #set market price
         
-        CSset =setCS()
-        limittime = CSset.nr_timesteps
+        limittime = cs.nr_timesteps
         price = pd.read_excel(self.file, 'spot_market')
-        
+        mask = price.date == initdata
+        initindex = mask.idxmax()
 
-        self.price_em = price.spot_price.values.tolist()[:limittime]
-     
-    #def storeDayAheadMarketData(self,datapath):
+        self.price_em = price.spot_price.values.tolist()[initindex: initindex + limittime]
+
         
         
     
-    def storeReserveMarketData(self, datapaths):
+    def balancingMarketData2Excel(self, bmtype='aFRR', quart2hour=False):
         
         ''' stored the data obtained from SMARD application with balancing market data'''
         
-        #datapath must be a list of paths
+        #get all the files in the corresponding bmtype folder
+        
+        bmfiles = os.listdir(os.path.join(self.bmdatapath, bmtype))
+        bmfiles.sort() #make sure they go from oldest to newest
+        
+        bmdf_list = []
+        
+        # store excel and sheet where to store the data
         
         targetdf = pd.read_excel(self.file, 'balancing_market')
+        
+        # load workbook to work on it but overlay previous content and not delete it
         
         excel_workbook = load_workbook(self.file)
         
@@ -514,17 +543,36 @@ class electricityMarket:
             writer.book = excel_workbook
             #writer.sheets = dict((ws.title, ws) for ws in excel_workbook.worksheets)
         
-            for path in datapaths:
+            for bmdata in bmfiles:
                 
-                data = pd.read_csv(path, sep=';')
+                fullpath = os.path.join(self.bmdatapath, bmtype, bmdata)
                 
-                data = data.replace('-',np.nan, regex=True) #replace - with zeros. For us , if there was no volume traded it is the same as a 0
+                #apply one or the other depending if the file is xlsx or csv
+                
+                if bmdata.split('.')[-1:][0] == 'xlsx':
+                    
+                    # im catching a warning here cause it seems to be kind of useless warning and it is the only way that it does not appear
+                    
+                    with warnings.catch_warnings(record=True):
+                        warnings.simplefilter("always")
+                        data = pd.read_excel(fullpath, header=9, engine="openpyxl") 
+                        
+                    
+                elif bmdata.split('.')[-1:][0 ]== 'csv':
+                    
+                    data = pd.read_csv(fullpath, sep=';')
+                
+                #CLEANING THE DATA AND SETTING CORRECT DATA TYPES
+                
+                data = data.replace('-',np.nan, regex=True) #replace - with nans
                 
                 # turn date and time into datetime format
                 
                 data['Date'] = pd.to_datetime(data['Date'])
                 
-                data['Time of day'] = pd.to_datetime(data['Time of day']).dt.time
+                data['Start'] = pd.to_datetime(data['Start']).dt.time
+                
+                data = data.drop(['End'], axis=1)
                 
                 # turn every object into numeric
                 
@@ -544,50 +592,96 @@ class electricityMarket:
                     
                     colmean = round(data[col].mean(), 3) #calculate mean of column
                     data[col] = data[col].fillna(colmean) #fill nans with that mean
-                        
-                #NOTE: Add data 4 by 4 to get hourly. then store. Important: Values change so much every 15 min cause volume if bidded for 4 hours but might be activated or not. 
+                
+                # TURN 15MIN DATA INTO HOUR
+                
+                #if quarter hour files were downloaded, set True. I did this and in between SMARD gave the option of download hourly values for balancing data (they do the calculation), so happy times
+                
+                if quart2hour:
+                    
+                    #NOTE: Add data 4 by 4 to get hourly. then store. Important: Values change so much every 15 min cause volume if bidded for 4 hours but might be activated or not. 
 
-                hourlydata = pd.DataFrame(columns=data.columns)
+                    hourlydata = pd.DataFrame(columns=data.columns)
+                    
+                    timestamps =  pd.date_range(datetime.combine(data["Date"][0].date(), data["Start"][0]), periods=7*24, freq="60min")
+                    
+                    hourlydata["Date"] = timestamps.date
+                    hourlydata["Start"] = timestamps.time
+                    
+                    
+                    #select columns: columns with power or energy, we add. columns with price, we make an average
+                    
+                    powermask = ['Volume' in col for col in data.columns]
+                    powercols = data.columns[powermask]
+                    
+                    pricemask = ['price' in col for col in data.columns]
+                    pricecols = data.columns[pricemask]
+                    
+                    for index,row in hourlydata.iterrows():
                 
-                timestamps =  pd.date_range(datetime.combine(data["Date"][0].date(), data["Time of day"][0]), periods=7*24, freq="60min")
+                        row[powercols] = sum(data.loc[index*4:(index+1)*4-1,powercols].values)
+                        row[pricecols] =  np.mean(data.loc[(index)*4:(index+1)*4-1,pricecols].values, axis=0)
+                    
+                else:
+                        
+                    hourlydata = data
                 
-                hourlydata["Date"] = timestamps.date
-                hourlydata["Time of day"] = timestamps.time
-                
-                
-                #select columns: columns with power or energy, we add. columns with price, we make an average
-                
-                powermask = ['Volume' in col for col in data.columns]
-                powercols = data.columns[powermask]
-                
-                pricemask = ['price' in col for col in data.columns]
-                pricecols = data.columns[pricemask]
-                
-                for index,row in hourlydata.iterrows():
-            
-                    row[powercols] = sum(data.loc[index*4:(index+1)*4-1,powercols].values)
-                    row[pricecols] =  np.mean(data.loc[(index)*4:(index+1)*4-1,pricecols].values, axis=0)
-                
-                #change names in hourlydata columns so we can match it
+                #change names in hourlydata columns so we can match it with the names in hourlydata
                 
                 hourlydata.columns = [text.replace('MW', 'kW') for text in hourlydata.columns]
                 
+                #REMOVE EXTRA DAY FOR LONG YEARS
                 
-                # different cases for FCR, aFRR and mFRR     
-                
-                if 'Automatic_Frequency_Restoration_Reserve' in path:
+                if hourlydata.shape[0] > 8760:
                     
-                    if len(targetdf.date) == 0 and len(targetdf.time) == 0:
-                        
-                        targetdf.date = hourlydata["Date"]
+                    mask = hourlydata["Date"] == datetime(hourlydata.loc[0,'Date'].year,2,29)
+                    
+                    hourlydata.drop(hourlydata[mask].index, inplace=True)
+                    
+                    hourlydata.reset_index(inplace=True, drop=True)
 
-                        targetdf.time = hourlydata["Time of day"]
-                        
+
+                #store dataframes in dictionary    
+                bmdf_list += [hourlydata] 
+            
+            
+            #mAKE THE AVERAGE OF ALL THE YEARS INCLUDED AND STORE IT IN DATAFRAME
+              
+            if len(bmdf_list)  > 2:
+                 
+                dfvalues = [frame.iloc[:,2:].values for frame in bmdf_list]
+                
+                valuesaddition = sum(dfvalues)
+                
+                valuesavg = valuesaddition/len(bmdf_list)
+                
+                hourlydata.iloc[:, 2:] = valuesavg
+                
+                #remove year from date as we have several dates
+                
+                hourlydata.Date = hourlydata.Date.dt.strftime('%m-%d')
+            
+            targetdf = targetdf.reindex(range(hourlydata.shape[0]))
+            
+            # NOTE: change here how to store the values considering new setup
+            
+            # different cases for FCR, aFRR and mFRR     
+            
+            targetdf.date = hourlydata["Date"]
+
+            targetdf.time = hourlydata["Start"]
+            
+            if bmtype == 'aFRR':                     
+                
+                for col in hourlydata.columns[2:]:
                     
-                    for col in hourlydata.columns[2:]:
-                        
-                        
+                    if '€' in col:
+                    
                         targetdf['aFRR-' + col] = hourlydata[col]/1000 #we change MW to kW
+                        
+                    else:
+                        
+                        targetdf['aFRR-' + col] = hourlydata[col]*1000
 
             #change MW to kW in column names
             
@@ -598,29 +692,25 @@ class electricityMarket:
             return targetdf
             
             
-    def setBalancingMarketAttributes(self):
+    def setBalancingMarketAttributes(self, bmtype, initdate, cs):
         
         bmdata = pd.read_excel(self.file, 'balancing_market')
         
-        colmask = ['aFRR' in col for col in bmdata.columns]
+        mask = bmdata['date']==initdate
+        
+        #get first true value 
+        
+        initindex = mask.idxmax()
+        
+        dftimelimited = bmdata.iloc[initindex:initindex + cs.nr_timesteps, :]
         
         #this is momentaneously hardcoded
         
-        self.price_aFRR_cap_pos = bmdata['aFRR-Procurement price (+)[€/kW]'].values
-        self.price_aFRR_cap_neg = bmdata['aFRR-Procurement price (-)[€/kW]'].values
+        self.price_aFRR_cap_pos = dftimelimited[bmtype + '-Procurement price (+) [€/kW]'].values
+        self.price_aFRR_cap_neg = dftimelimited[bmtype + '-Procurement price (-) [€/kW]'].values
         
-        self.price_aFRR_en_pos = bmdata['aFRR-Activation price (+)[€/kWh]'].values
-        self.price_aFRR_en_neg = bmdata['aFRR-Activation price (-)[€/kWh]'].values
-        
-        print()
-        
-        
-    def setReserveMarketAttributes(self):  # NOTE: UNIFINSHED
-        
-
-        reserveprice = pd.read_excel(self.file, 'balancing_market')
-        
-        print()
+        self.price_aFRR_en_pos = dftimelimited[bmtype + '-Activation price (+) [€/kWh]'].values
+        self.price_aFRR_en_neg = dftimelimited[bmtype + '-Activation price (-) [€/kWh]'].values
             
 
 
